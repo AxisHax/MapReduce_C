@@ -4,7 +4,7 @@ First thing you need to do is check if you have git installed on your Linux setu
 If the command is not recognized then you just need to install git. Run this command to do that: ```sudo apt install git```
 
 # Setting up your credentials
-Next, you need to let git know your account information so it can push/pull any repositories you have/are contributing to. Put in your username and email like this:\
+Next, you need to let git know your account information so it can push/pull any repositories you have/are contributing to. Put in your username and email like this:
 ```
 git config --global user.name "your github username"
 git config --global user.email youremail@example.com
