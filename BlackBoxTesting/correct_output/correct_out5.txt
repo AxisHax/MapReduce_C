@@ -1,0 +1,9 @@
+to:11
+you:10
+me:7
+don't:4
+for:4
+the:4
+and:3
+come:3
+think:3
