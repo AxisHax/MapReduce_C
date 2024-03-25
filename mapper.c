@@ -70,6 +70,13 @@ typedef struct work_param_struct
     list* l;
 } work_param_struct;
 
+typedef struct send_param_struct
+{
+    int msg_q_id;
+    key_t k;
+    list* l;
+}send_param_struct;
+
 /*
 typedef struct word_struct
 {// message sent from mapper to reducer
@@ -119,39 +126,43 @@ node* list_rem_head(list* l);
 // MAIN
 int main(int argc, char **argv)
 {
-
+// CHECK IF ARGS ARE VALID
     if (argc != 3) 
     {
-        printf("ERROR: wrong arguments\n");
+        printf("ERROR: wrong arguments\n\n");
         return -1;
     } // if file is run without commandFile bufferSize
 
-    // this is the max size of the buffer m_list
-    int buff_size = atoi(argv[2]);
-
-    printf("buff_size: %d\n\n", buff_size);
-
+// VARIABLE DECLARATION AND INITILIZATIONS
+    int buff_size = atoi(argv[2]); // this is the max size of the buffer m_list
+    printf("buff_size: %d\n\n\n\n", buff_size);
     sem_init(&empty, 0, buff_size);
     sem_init(&full, 0, 0);
     sem_init(&mutex, 0, 1);
-
-
-
-    // for each map command create process
-    // open map file
-
-    // currently 
-    FILE *cmd_file;
-    cmd_file = fopen(argv[1], "r"); // need error handling if wrong file is provided
-
-
+    FILE *cmd_file = fopen(argv[1], "r");
     char dir_name[MAX_LINE_SIZE];
     pid_t x, wpid;
     int status = 0;
+    message end_m;
 
-    printf("Parent process ID should be: %d\n", getpid());
+    int message_q_id;
+    key_t key;
+    if((key = ftok("mapper.c", 1)) == -1)
+    {
+        perror("ftok");
+        exit(1);
+    }
+
+    if((message_q_id = msgget(key, 0644 | IPC_CREAT)) == -1)
+    {
+        perror("msgget");
+        exit(1);
+    }
+
+
+    printf("Parent process ID should be: %d\n\n", getpid());
     
-    while(fscanf(cmd_file, "map %s\n", dir_name) != EOF)
+    while(fscanf(cmd_file, "map %s\n\n", dir_name) != EOF)
     {
         // for each map command, fork
         x = fork();
@@ -167,27 +178,32 @@ int main(int argc, char **argv)
     if(x > 0)
     {
         fclose(cmd_file);
-        printf("I am the parent with pid = %d\n", getpid());
+        printf("I am the parent with pid = %d\n\n", getpid());
         // don't return, find proc wait function, do that then send message
         
         // make end message
-        message end_m;
+        
         strcpy(end_m.content, "");// empty word could be a sign
         end_m.type = 0; // idk how to do this
 
         // wait for other processes to conclude
-        while ((wpid = wait(&status)) > 0){printf("waiting...\n");};
+        while ((wpid = wait(&status)) > 0){printf("waiting...\n\n");};
         // send end_m in message queue
 
-        printf("status: %d\n", wait(&status));
+        printf("status: %d\n\n", wait(&status));
 
-        printf("parent process closing\n");
+    if(msgsnd(message_q_id, &end_m , MAX_WORD_SIZE, 0) == -1) 
+    {
+        perror("Error in msgsnd");
+    }
+
+        printf("parent process closing\n\n");
         exit(0);
     }
     else if(x == 0)
     {
-        printf("I am child with pid = %d\n", getpid());
-        printf("\tline: %s\n", dir_name); // line = directory path
+        printf("I am child with pid = %d\n\n", getpid());
+        printf("\tline: %s\n\n", dir_name); // line = directory path
         
         // make bounded buffer here
         list* buf = create_list(buff_size);
@@ -261,7 +277,7 @@ int main(int argc, char **argv)
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
 
-                printf("filepath before thread creation: %s\n", file_path);
+                printf("filepath before thread creation: %s\n\n", file_path);
                 //create thread
                 
                 pthread_create(&worker_tid[i], &worker_attr[i], worker, wp);// work param needs "line + filename"
@@ -270,22 +286,31 @@ int main(int argc, char **argv)
 
         }
 
-        pthread_attr_init(&sender_attr);
-        pthread_create(&sender_tid, &sender_attr, sender, buf);
+        send_param_struct* sp = malloc(sizeof(send_param_struct));
+        sp->l = buf;
+        sp->k = key;
+        sp->msg_q_id = message_q_id;
 
+        pthread_attr_init(&sender_attr);
+        pthread_create(&sender_tid, &sender_attr, sender, sp);
+
+
+
+// WRAP UP VARIABLES AND POINTERS
+// this doesn't happen until all of the threads are complete
         pthread_join(sender_tid, NULL);
         for(int i = 0; i < num_workers; i++)
         {
             pthread_join(worker_tid[i], NULL);
         }
-        
+        list_destroy(buf);
         sem_destroy(&empty);// workers wait on this to put struct in buffer
         sem_destroy(&full);// senders wait on this to send struct to reducer.c
         sem_destroy(&mutex);//
         closedir(dir);
         free(worker_tid);
         free(worker_attr);
-        printf("child process: %d complete\n", getpid());
+        printf("child process: %d complete\n\n", getpid());
         exit(0);
     }
 
@@ -308,19 +333,24 @@ struct work_p
 
 // FUNCTION DEFINITIONS
 // create buffer to share with reducer.c
-void *sender(void *buff_void)
-{
-    printf("sender thread %d starting\n", pthread_self());
+
+void *sender(void *send_param_voidptr)
+{// this needs to loop dummy
+// how does sender know when workers are done?
+// message queue needs to be made in the parent process, maybe even
+    printf("sender thread %d starting\n\n", pthread_self());
+
+    send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     
-    list* buf = (list *) buff_void; 
+    //list* buf = (list *) buff_void; 
 
     sem_wait(&full);
     sem_wait(&mutex);
-    message m = list_rem_head(buf)->to_send;
+    message m = list_rem_head(sp->l)->to_send;
     sem_post(&mutex);
     sem_post(&empty);
 
-
+/*
     int message_q_id;
     key_t key;
     
@@ -335,16 +365,17 @@ void *sender(void *buff_void)
         perror("msgget");
         exit(1);
     }
+*/
 
-    printf("key: %d\n", key);
+    printf("key: %d\n\n", sp->k);
 
-    if(msgsnd(message_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
+    if(msgsnd(sp->msg_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
     {
         perror("Error in msgsnd");
     }
 
 
-    printf("sender thread ending\n");
+    printf("sender thread ending\n\n");
     pthread_exit(0);
 }
 
@@ -356,7 +387,7 @@ void *worker(void *work_param_voidptr)
 {
     
     //work_param_struct wp = (work_param_struct) *work_param_voidptr;
-    printf("worker thread %d starting\n", pthread_self());
+    printf("worker thread %d starting\n\n", pthread_self());
 
 
 
@@ -364,7 +395,7 @@ void *worker(void *work_param_voidptr)
 
 
 
-    printf("thread %d file_name: %s\n", pthread_self(), wp->f_n);
+    printf("thread %d file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
 
     
@@ -390,7 +421,7 @@ void *worker(void *work_param_voidptr)
         sem_post(&full);
     }
 
-    printf("worker thread ending\n");
+    printf("worker thread ending\n\n");
     pthread_exit(0);
 }
 
@@ -434,7 +465,7 @@ void list_add_tail(list* l, node* m)
 {
     if(l->size == l->max_size) 
     {
-        printf("ERROR: adding to full list\n"); 
+        printf("ERROR: adding to full list\n\n"); 
         return;
     }
 
@@ -458,7 +489,7 @@ node* list_rem_head(list* l)
 {
     if(l->size == 0)
     { 
-        printf("ERROR: removing from empty list\n");
+        printf("ERROR: removing from empty list\n\n");
         return NULL;
     }
     node* m = l->head;
