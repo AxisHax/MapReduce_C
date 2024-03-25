@@ -64,6 +64,12 @@ typedef struct list
     unsigned int max_size;
 } list;
 
+typedef struct work_param_struct
+{
+    char f_n[MAX_WORD_SIZE];
+    list* l;
+} work_param_struct;
+
 /*
 typedef struct word_struct
 {// message sent from mapper to reducer
@@ -113,6 +119,7 @@ node* list_rem_head(list* l);
 // MAIN
 int main(int argc, char **argv)
 {
+
     if (argc != 3) 
     {
         printf("ERROR: wrong arguments\n");
@@ -127,6 +134,8 @@ int main(int argc, char **argv)
     sem_init(&empty, 0, buff_size);
     sem_init(&full, 0, 0);
     sem_init(&mutex, 0, 1);
+
+
 
     // for each map command create process
     // open map file
@@ -217,35 +226,45 @@ int main(int argc, char **argv)
         }
         closedir(dir);
 
-        
+        /*
         char *files[num_workers];
         for(i = 0; i < num_workers; i++)
         {
             files[i] = malloc(sizeof(char) * MAX_LINE_SIZE);
         }
+        */
 
         
         // not sure if i need to close and reopen
         // need to find num_workers to determine how big worker_(tid, attr) needed to be
-        char file_path[MAX_LINE_SIZE];
+        char* file_path;
         
         dir = opendir(dir_name);
         worker_tid = (pthread_t*)malloc(sizeof(pthread_t) * num_workers);
         worker_attr = (pthread_attr_t*)malloc(sizeof(pthread_attr_t) * num_workers);
+
+        work_param_struct* wp;
+        
         
         while((  (dir_ent = readdir(dir)) != NULL && i < num_workers)) // how to propperly assign readdir?
         {
             if(dir_ent->d_type == DT_REG)
             {
                 // create file path
+                file_path = malloc(sizeof(char) * MAX_LINE_SIZE);
                 strcpy(file_path, dir_name);
                 strcat(file_path, "/");
                 strcat(file_path, dir_ent->d_name);
 
+                wp = malloc(sizeof(work_param_struct));
+
+                strcpy(wp->f_n, file_path);
+                wp->l = buf;
+
                 printf("filepath before thread creation: %s\n", file_path);
                 //create thread
                 
-                pthread_create(&worker_tid[i], &worker_attr[i], worker, file_path);// work param needs "line + filename"
+                pthread_create(&worker_tid[i], &worker_attr[i], worker, wp);// work param needs "line + filename"
                 i++;
             }
 
@@ -295,27 +314,21 @@ void *sender(void *buff_void)
     
     list* buf = (list *) buff_void; 
 
-    printf("\t1\n");
-
     sem_wait(&full);
     sem_wait(&mutex);
     message m = list_rem_head(buf)->to_send;
     sem_post(&mutex);
     sem_post(&empty);
 
-    printf("\t2\n");
 
     int message_q_id;
     key_t key;
-
-printf("\t3\n");
     
     if((key = ftok("mapper.c", 1)) == -1)
     {
         perror("ftok");
         exit(1);
     }
-    printf("/t4\n");
 
     if((message_q_id = msgget(key, 0644 | IPC_CREAT)) == -1)
     {
@@ -337,19 +350,26 @@ printf("\t3\n");
 
 // each worker gets a file to read and return data from
 // I need work_param struct 
-typedef struct work_param_struct
-{
-    char f_n[MAX_WORD_SIZE];
-    list* l;
-} work_param_struct;
+
+
 void *worker(void *work_param_voidptr)
 {
+    
     //work_param_struct wp = (work_param_struct) *work_param_voidptr;
     printf("worker thread %d starting\n", pthread_self());
+
+
+
     work_param_struct* wp = (work_param_struct *) work_param_voidptr;
 
-    printf("thread %d file_name: %s\n", pthread_self(), wp.f_n);
-    FILE* to_work = fopen(wp.f_n, "r");
+
+
+    printf("thread %d file_name: %s\n", pthread_self(), wp->f_n);
+    FILE* to_work = fopen(wp->f_n, "r");
+
+    
+
+    free(wp->f_n);
 
     char word_1[MAX_WORD_SIZE];
     while(fscanf(to_work, "%s", word_1) != EOF)
@@ -361,9 +381,11 @@ void *worker(void *work_param_voidptr)
         //strcpy(new->data->message, word_1); // could also put this in fscanf
         
         // buffer and argv need to be passed, need to make work_param struct
+
+        
         sem_wait(&empty);
         sem_wait(&mutex);
-        list_add_tail(wp.l, new); // this needs to be passed?
+        list_add_tail(wp->l, new); // this needs to be passed?
         sem_post(&mutex);
         sem_post(&full);
     }
@@ -410,8 +432,13 @@ void list_destroy(list* l)
 
 void list_add_tail(list* l, node* m)
 {
-    if(l->size == l->max_size) {printf("ERROR: adding to full list\n"); return;}
+    if(l->size == l->max_size) 
+    {
+        printf("ERROR: adding to full list\n"); 
+        return;
+    }
 
+    
     if(l->size == 0)
     {
         l->head = m;
@@ -420,28 +447,37 @@ void list_add_tail(list* l, node* m)
     else
     {
         l->tail->next = m;
+        m->prev = l->tail;
         l->tail = m;
     }
     l->size++;
-    sem_post(&mutex);
-    sem_post(&full);
 
 }
 
 node* list_rem_head(list* l)
 {
-    if(l->size ==0){ printf("ERROR: removing from empty list\n");return NULL;}
+    if(l->size == 0)
+    { 
+        printf("ERROR: removing from empty list\n");
+        return NULL;
+    }
     node* m = l->head;
 
-    if(l->size != 1)
+    if(l->size == 1)
     {
-        l->head = l->head->prev;
-        l->head->next = NULL;
+        l->head = NULL;
+        l->tail = NULL;
+    }
+    else//if(l->size != 1)
+    {
+        l->head = l->head->next;
+        l->head->prev = NULL;
 
         m->next = NULL;
         m->prev = NULL;
     }
     
     l->size--;
+
     return m;
 }

@@ -274,17 +274,20 @@ int main(int argc, char* argv[])
 		perror("msgctl");
 		exit(1);
 	}
+
+	printf("message queue size: %ld\n", info.msg_qnum);
 	
 	// Do stuff with words in the message queue.
-	while(info.msg_qnum > 0)
+	while(1)// check type of message?
 	{
+		
 		// Get messages from the message queue
 		if(msgrcv(message_queue_id, &message, MAXWORDSIZE, 0, 0) == 1)
 		{
 			perror("msgrcv");
 			exit(1);
 		}
-		
+		printf("looping...\n");
 		// Check if the word already exists in the list. If not, simply add, but if so just increment the count.
 		if(list->head == NULL && list->tail == NULL)
 		{
