@@ -63,6 +63,7 @@ typedef struct send_param_struct
     list* l;
     int num_workers;
     char worker_done_flags_sender[]; //something to inform when worker threads end
+
 }send_param_struct;
 
 
@@ -200,17 +201,13 @@ int main(int argc, char **argv)
         sp->l = buf;
         sp->k = key;
         sp->msg_q_id = message_queue_id;
-        //sp->worker_done_flags_sender = malloc(sizeof(char) * num_workers);
         sp->num_workers = num_workers;
 
 
         for(int j = 0; j < num_workers; j++)
         {
             sp->worker_done_flags_sender[j] = 0;
-        }
-
-
-        
+        }        
         
         while((  (dir_ent = readdir(dir)) != NULL && i < num_workers)) // how to propperly assign readdir?
         {
@@ -222,9 +219,11 @@ int main(int argc, char **argv)
                 strcat(file_path, "/");
                 strcat(file_path, dir_ent->d_name);
                 // put file path in work_param_struct
+                
                 wp = malloc(sizeof(work_param_struct));
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
+                
                 wp->worker_done_flag_worker = &sp->worker_done_flags_sender[i];
 
                 //create thread
@@ -275,7 +274,7 @@ void *sender(void *send_param_voidptr)
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     printf("key: %d\n\n", sp->k);
     int i;
-    int flag = 1;
+    int flag = 0;
 
     node* m;
 
@@ -308,16 +307,15 @@ void *sender(void *send_param_voidptr)
         sem_post(&mutex);
         sem_post(&empty);
 
-        msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0); 
-        //if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
-        //{
+        //msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0); 
+        if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
+        {
             //printf("error in msgsnd\n");
             //perror("Error in msgsnd");
-        //}
-        //printf("sending {%s}\n", m->to_send.content);
-        //printf("sizeof list: %d\n", sp->l->size);
-        //free(m); // free(): double free detected in tcache 2
-        printf("hello\n");
+        }
+        printf("sending {%s}\n", m->to_send.content);
+        printf("sizeof list: %d\n", sp->l->size);
+        //free(m);
     }
     printf("sender thread %ld ending\n\n", pthread_self());
     pthread_exit(0);
@@ -325,22 +323,23 @@ void *sender(void *send_param_voidptr)
 
 void *worker(void *work_param_voidptr)
 {
+    
     printf("worker thread %ld starting\n\n", pthread_self());
 
     work_param_struct* wp = (work_param_struct *) work_param_voidptr;
 
     printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
-
+    node* new;
     
 
-    free(wp->f_n);
+    
 
     char word_1[MAX_WORD_SIZE];
     while(fscanf(to_work, "%s", word_1) != EOF)
     {
         
-        node* new = create_node(word_1);
+        new = create_node(word_1);
 
         
         sem_wait(&empty);
@@ -349,7 +348,8 @@ void *worker(void *work_param_voidptr)
         sem_post(&mutex);
         sem_post(&full);
     }
-
+    fclose(to_work);
+    free(wp->f_n);
     *(wp->worker_done_flag_worker) = 1;
     printf("worker thread ending\n\n");
     pthread_exit(0);
