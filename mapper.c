@@ -222,7 +222,6 @@ int main(int argc, char **argv)
                 strcat(file_path, "/");
                 strcat(file_path, dir_ent->d_name);
                 // put file path in work_param_struct
-                // put file path in work_param_struct
                 wp = malloc(sizeof(work_param_struct));
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
