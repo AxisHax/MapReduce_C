@@ -96,18 +96,22 @@ void list_print(List *list)
 /// @brief Print elements of the linked list with at least minFrequency count of words.
 /// @param list 
 /// @param minFrequency 
-void list_print_by_frequency(List *list, int minFrequency) 
+void list_write_to_file(List *list, int minFrequency, FILE *f) 
 {
 	Node *ptr = list->head;  
 	while (ptr != NULL) 
 	{
 		if(ptr->count >= minFrequency && ptr != NULL)
 		{
-			printf("%s:%d\n", ptr->word, ptr->count);
+			fprintf(f,"%s:%d\n", ptr->word, ptr->count);
 			ptr = ptr->next;
 		}
+		else
+		{
+			break;
+		}
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 /// @brief Print the first n elements of a linked list.
@@ -204,31 +208,16 @@ void list_insert_sorted(Node *node, List *list) {
 					return;
 				}
 			}
-			else
-			{// If the word is >= the word we're comparing against, break out. This will allow the pointer to advance and we can check the next node.
-				break;
+
+			if(pointer == list->tail)
+			{
+				pointer -> next = newNode;
+				newNode -> prev = pointer;
+				newNode -> next = NULL;
+				list -> tail = newNode;
+				list -> count++;
+				return;
 			}
-			/* else if(strcmp(node->word, pointer->word) > 0)
-			{// If we get a return val greater than 0 then it means the first word has a higher value than the second word, meaning it should be appended after it in the list.
-				if(pointer == list->tail)
-				{// Insert then update the tail node.
-					node -> prev = pointer;
-					node -> next = NULL;
-					pointer -> next = node;
-					list -> tail = node;
-					list -> count++;
-					return;
-				}
-				else
-				{// We're inserting between two nodes.
-					node -> prev = pointer;
-					node -> next = pointer -> next;
-					pointer -> next -> prev = node;
-					pointer -> next = node;
-					list -> count++;
-					return;
-				}
-			} */
 		}
 		else if(pointer == list->tail)
 		{// Insert at the end of the list
@@ -249,12 +238,11 @@ int main(int argc, char* argv[])
     {
         printf("ERROR: wrong arguments\n");
         return -1;
-    } // if file is run without commandFile bufferSize
+    }
 
-	//char *outputFile;
+	char *outputFile = strdup(argv[1]);
 	unsigned int minFrequency = atoi(argv[2]);
-	//strcpy(*outputFile, argv[1]);
-
+	FILE *f;
 	Message message;
 	List *list = list_create();
 	struct msqid_ds info;
@@ -293,8 +281,6 @@ int main(int argc, char* argv[])
 			break;
 		} 
 
-		printf("Recieved: %s\n", message.content);
-
 		// Check if the word already exists in the list. If not, simply add, but if so just increment the count.
 		if(list->head == NULL && list->tail == NULL)
 		{
@@ -306,7 +292,7 @@ int main(int argc, char* argv[])
 			Node *cur = list->head;
 			while(cur != NULL)
 			{
-				if(strcasecmp(message.content, cur->word) == 0)
+				if(strcmp(message.content, cur->word) == 0)
 				{
 					cur -> count++;
 					break;
@@ -322,8 +308,6 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	list_print(list);
-
 	// Now add the words into a new list but in sorted order
 	List *sortedWords = list_create();
 	Node *cur = list->head;
@@ -332,9 +316,13 @@ int main(int argc, char* argv[])
 		list_insert_sorted(cur, sortedWords);
 		cur = cur -> next;
 	}
-	
-	// Print list contents.
-	list_print_by_frequency(sortedWords, minFrequency);
+
+	if((f = fopen(outputFile, "w")) == NULL)
+	{
+		printf("Error opening file.");
+		exit(1);
+	}
+	list_write_to_file(sortedWords, minFrequency, f);
 	
 	if(msgctl(message_queue_id, IPC_RMID, NULL) == -1)
 	{
