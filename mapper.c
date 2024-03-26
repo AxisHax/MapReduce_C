@@ -1,11 +1,3 @@
-/*
-program runs as follows
-    user enters:
-        ./mapper commandFile bufferSize
-    command file has n directoryPaths
-    buffer size has size of buffer between map and red
-
-*/
 #define _DEFAULT_SOURCE 
 
 #include <assert.h>
@@ -27,22 +19,15 @@ program runs as follows
 #define MAX_WORD_SIZE 256
 
 // GLOBAL VARS
-sem_t empty; // need to do sem_init(&empty, 0, buffsize)
-sem_t full; // need to do sem_init(&full, 0, 0)
-sem_t mutex; // need to do sem_init(&mutex, 0, 1)
+sem_t empty;
+sem_t full;
+sem_t mutex;
 
 int buf_size;
 
 
 
 // STRUCT DEFINITIONS
-
-// struct sent to reciver.c
-// THIS IS WRONG
-// message needs to be 
-
-// maybe just make message
-
 typedef struct message
 {
     long type;
@@ -77,36 +62,6 @@ typedef struct send_param_struct
     list* l;
 }send_param_struct;
 
-/*
-typedef struct word_struct
-{// message sent from mapper to reducer
-    char word[MAX_WORD_SIZE];
-    int count;
-} word_struct;
-
-typedef struct message
-{
-    long mtype;
-    word_struct w;
-
-} message;
-
-// linked list node sending messages
-typedef struct m_node 
-{// node wrapper for message
-    message data;
-    struct m_node* next;
-} m_node;
-
-// node used as to_send buffer
-typedef struct m_list
-{
-    m_node* head;
-    m_node* tail;
-    int size;
-} m_list;
-
-*/
 
 // FUNCTION DECLARATIONS
 
@@ -187,6 +142,7 @@ int main(int argc, char **argv)
         end_m.type = 1; // idk how to do this
 
         // wait for other processes to conclude
+        printf("commence waiting\n\n");
         while ((wpid = wait(&status)) > 0){printf("waiting...\n\n");};
         // send end_m in message queue
 
@@ -205,34 +161,23 @@ int main(int argc, char **argv)
         printf("I am child with pid = %d\n\n", getpid());
         printf("\tline: %s\n\n", dir_name); // line = directory path
         
-        // make bounded buffer here
+    // variables needed for each process, shared between threads
         list* buf = create_list(buff_size);
-
-        // create sender thread
         pthread_t sender_tid;
         pthread_attr_t sender_attr;
-
-        // do sender thread stuff
-          /* get the default attributes */
-        //pthread_attr_init(&sender_attr);
-
-        /* create the thread */
-
-        //pthread_create(&sender_tid, &sender_attr, sender, buf); //what does sender need?
-        
-
-        // for each file in command dir create worker thread
-        pthread_t *worker_tid; // how big to makes these?
+        pthread_t *worker_tid;
         pthread_attr_t *worker_attr;
         int num_workers = 0;
         int i = 0;
-
-        // change names to show understanding-------------------------------------------------------------------------
         struct dirent *dir_ent;
         DIR *dir = opendir(dir_name);
 
-        // idk why i needed to count num_workers
-        // get num files
+        char* file_path;
+
+        work_param_struct* wp;
+
+        send_param_struct* sp;
+
         while( (dir_ent = readdir(dir)) != NULL)
         {
             if(dir_ent->d_type == DT_REG) 
@@ -241,25 +186,12 @@ int main(int argc, char **argv)
             }
         }
         closedir(dir);
-
-        /*
-        char *files[num_workers];
-        for(i = 0; i < num_workers; i++)
-        {
-            files[i] = malloc(sizeof(char) * MAX_LINE_SIZE);
-        }
-        */
-
-        
-        // not sure if i need to close and reopen
-        // need to find num_workers to determine how big worker_(tid, attr) needed to be
-        char* file_path;
         
         dir = opendir(dir_name);
         worker_tid = (pthread_t*)malloc(sizeof(pthread_t) * num_workers);
         worker_attr = (pthread_attr_t*)malloc(sizeof(pthread_attr_t) * num_workers);
 
-        work_param_struct* wp;
+
         
         
         while((  (dir_ent = readdir(dir)) != NULL && i < num_workers)) // how to propperly assign readdir?
@@ -271,22 +203,19 @@ int main(int argc, char **argv)
                 strcpy(file_path, dir_name);
                 strcat(file_path, "/");
                 strcat(file_path, dir_ent->d_name);
-
+                // put file path in work_param_struct
                 wp = malloc(sizeof(work_param_struct));
-
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
-
-                printf("filepath before thread creation: %s\n\n", file_path);
                 //create thread
-                
                 pthread_create(&worker_tid[i], &worker_attr[i], worker, wp);// work param needs "line + filename"
                 i++;
             }
 
         }
 
-        send_param_struct* sp = malloc(sizeof(send_param_struct));
+    // start sender thread
+        sp = malloc(sizeof(send_param_struct));
         sp->l = buf;
         sp->k = key;
         sp->msg_q_id = message_queue_id;
@@ -297,7 +226,6 @@ int main(int argc, char **argv)
 
 
 // WRAP UP VARIABLES AND POINTERS
-// this doesn't happen until all of the threads are complete
         pthread_join(sender_tid, NULL);
         for(int i = 0; i < num_workers; i++)
         {
@@ -310,6 +238,8 @@ int main(int argc, char **argv)
         closedir(dir);
         free(worker_tid);
         free(worker_attr);
+        free(wp);
+        free(sp);
         printf("child process: %d complete\n\n", getpid());
         exit(0);
     }
@@ -317,80 +247,56 @@ int main(int argc, char **argv)
     //return 0;
 }
 
-// STRUCT DEFINITIONS
-
-/*
-struct send_p
-{
-    // idk might not need this
-};
-
-struct work_p
-{
-    char* file_path;
-};
-*/
 
 // FUNCTION DEFINITIONS
-// create buffer to share with reducer.c
 
 void *sender(void *send_param_voidptr)
-{// this needs to loop dummy
-// how does sender know when workers are done?
-// message queue needs to be made in the parent process, maybe even
-    printf("sender thread %d starting\n\n", pthread_self());
+{
+    printf("sender thread %ld starting\n\n", pthread_self());
 
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
-    
-    //list* buf = (list *) buff_void; 
-
-    //while(sp->l->size != 0)
-    //{}
-
-    sem_wait(&full);
-    sem_wait(&mutex);
-    message m = list_rem_head(sp->l)->to_send;
-    sem_post(&mutex);
-    sem_post(&empty);
-
-/*
-    int message_queue_id;
-    key_t key;
-    
-    if((key = ftok("mapper.c", 1)) == -1)
-    {
-        perror("ftok");
-        exit(1);
-    }
-
-    if((message_queue_id = msgget(key, 0644 | IPC_CREAT)) == -1)
-    {
-        perror("msgget");
-        exit(1);
-    }
-*/
-
     printf("key: %d\n\n", sp->k);
 
-    if(msgsnd(sp->msg_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
+    while(sp->l->size != 0) // this is dum, replace with way to check if other threads are done or not
     {
-        perror("Error in msgsnd");
+    // while(1)
+        // for(worker_threads)
+            // if (thread isn't done) flag = false
+        // if (flag && l->list->size == 0) exit(0)
+
+        sem_wait(&full);
+        sem_wait(&mutex);
+        node* m = list_rem_head(sp->l);
+        sem_post(&mutex);
+        sem_post(&empty);
+
+
+        if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
+        {
+            perror("Error in msgsnd");
+        }
+        printf("sending {%s}\n\n", m->to_send.content);
+        printf("sizeof list: %d\n\n", sp->l->size);
+        int i; 
+        sem_getvalue(&mutex, &i);
+        printf("sem mutex: %i\n", i);
+        i = sem_getvalue(&full, &i);
+        printf("sem full: %i\n",i);
+        i = sem_getvalue(&empty, &i);
+        printf("sem empty: %i\n",i);
+        free(m);
     }
 
+    
 
-    printf("sender thread ending\n\n");
+    printf("sender thread %ld ending\n\n", pthread_self());
     pthread_exit(0);
 }
-
-// each worker gets a file to read and return data from
-// I need work_param struct 
-
 
 void *worker(void *work_param_voidptr)
 {
     
-    //work_param_struct wp = (work_param_struct) *work_param_voidptr;
-    printf("worker thread %d starting\n\n", pthread_self());
+    printf("worker thread %ld starting\n\n", pthread_self());
 
 
 
@@ -398,7 +304,7 @@ void *worker(void *work_param_voidptr)
 
 
 
-    printf("thread %d file_name: %s\n\n", pthread_self(), wp->f_n);
+    printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
 
     
@@ -407,19 +313,14 @@ void *worker(void *work_param_voidptr)
 
     char word_1[MAX_WORD_SIZE];
     while(fscanf(to_work, "%s", word_1) != EOF)
-    {// this part is easy, so it's really hard
-    // go through the file and count how many times each word happens
-        //strcmp();
+    {
         
         node* new = create_node(word_1);
-        //strcpy(new->data->message, word_1); // could also put this in fscanf
-        
-        // buffer and argv need to be passed, need to make work_param struct
 
         
         sem_wait(&empty);
         sem_wait(&mutex);
-        list_add_tail(wp->l, new); // this needs to be passed?
+        list_add_tail(wp->l, new);
         sem_post(&mutex);
         sem_post(&full);
     }
