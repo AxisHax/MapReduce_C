@@ -145,7 +145,7 @@ int main(int argc, char **argv)
     int status = 0;
     message end_m;
 
-    int message_q_id;
+    int message_queue_id;
     key_t key;
     if((key = ftok("mapper.c", 1)) == -1)
     {
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    if((message_q_id = msgget(key, 0644 | IPC_CREAT)) == -1)
+    if((message_queue_id = msgget(key, 0644 | IPC_CREAT)) == -1)
     {
         perror("msgget");
         exit(1);
@@ -184,7 +184,7 @@ int main(int argc, char **argv)
         // make end message
         
         strcpy(end_m.content, "");// empty word could be a sign
-        end_m.type = 0; // idk how to do this
+        end_m.type = 1; // idk how to do this
 
         // wait for other processes to conclude
         while ((wpid = wait(&status)) > 0){printf("waiting...\n\n");};
@@ -192,10 +192,10 @@ int main(int argc, char **argv)
 
         printf("status: %d\n\n", wait(&status));
 
-    if(msgsnd(message_q_id, &end_m , MAX_WORD_SIZE, 0) == -1) 
-    {
-        perror("Error in msgsnd");
-    }
+        if(msgsnd(message_queue_id, &end_m , MAX_WORD_SIZE, 0) == -1) 
+        {
+            perror("Error in msgsnd");
+        }
 
         printf("parent process closing\n\n");
         exit(0);
@@ -289,7 +289,7 @@ int main(int argc, char **argv)
         send_param_struct* sp = malloc(sizeof(send_param_struct));
         sp->l = buf;
         sp->k = key;
-        sp->msg_q_id = message_q_id;
+        sp->msg_q_id = message_queue_id;
 
         pthread_attr_init(&sender_attr);
         pthread_create(&sender_tid, &sender_attr, sender, sp);
@@ -351,7 +351,7 @@ void *sender(void *send_param_voidptr)
     sem_post(&empty);
 
 /*
-    int message_q_id;
+    int message_queue_id;
     key_t key;
     
     if((key = ftok("mapper.c", 1)) == -1)
@@ -360,7 +360,7 @@ void *sender(void *send_param_voidptr)
         exit(1);
     }
 
-    if((message_q_id = msgget(key, 0644 | IPC_CREAT)) == -1)
+    if((message_queue_id = msgget(key, 0644 | IPC_CREAT)) == -1)
     {
         perror("msgget");
         exit(1);
