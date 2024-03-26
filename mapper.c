@@ -344,6 +344,9 @@ void *sender(void *send_param_voidptr)
     
     //list* buf = (list *) buff_void; 
 
+    //while(sp->l->size != 0)
+    //{}
+
     sem_wait(&full);
     sem_wait(&mutex);
     message m = list_rem_head(sp->l)->to_send;
