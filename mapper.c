@@ -103,6 +103,8 @@ int main(int argc, char **argv)
     int status = 0;
     message end_m;
 
+    struct msqid_ds info;
+
     //char* worker_done_flag;
 
     int message_queue_id;
@@ -119,6 +121,13 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    if(msgctl(message_queue_id, IPC_STAT, &info) == -1)
+	{
+		perror("msgctl");
+		exit(1);
+	}
+
+    info.msg_qbytes = 32768;
 
     printf("Parent process ID should be: %d\n\n", getpid());
     
@@ -143,7 +152,7 @@ int main(int argc, char **argv)
         
         // make end message
         
-        strcpy(end_m.content, "");// empty word could be a sign
+        strcpy(end_m.content, "_");// empty word could be a sign
         end_m.type = 1; // idk how to do this
 
         // wait for other processes to conclude

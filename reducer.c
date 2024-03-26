@@ -101,7 +101,7 @@ void list_print_by_frequency(List *list, int minFrequency)
 	Node *ptr = list->head;  
 	while (ptr != NULL) 
 	{
-		if(ptr->count >= minFrequency)
+		if(ptr->count >= minFrequency && ptr != NULL)
 		{
 			printf("%s:%d\n", ptr->word, ptr->count);
 			ptr = ptr->next;
@@ -287,10 +287,13 @@ int main(int argc, char* argv[])
 			exit(1);
 		}
 
-		if(strcmp(message.content, "") == 0)
+
+		if(strcmp(message.content, "_") == 0)
 		{
 			break;
 		} 
+
+		printf("Recieved: %s\n", message.content);
 
 		// Check if the word already exists in the list. If not, simply add, but if so just increment the count.
 		if(list->head == NULL && list->tail == NULL)
@@ -318,6 +321,8 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+
+	list_print(list);
 
 	// Now add the words into a new list but in sorted order
 	List *sortedWords = list_create();
