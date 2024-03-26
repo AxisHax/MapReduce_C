@@ -187,6 +187,7 @@ int main(int argc, char **argv)
         end_m.type = 1; // idk how to do this
 
         // wait for other processes to conclude
+        printf("commence waiting\n\n");
         while ((wpid = wait(&status)) > 0){printf("waiting...\n\n");};
         // send end_m in message queue
 
@@ -338,7 +339,7 @@ void *sender(void *send_param_voidptr)
 {// this needs to loop dummy
 // how does sender know when workers are done?
 // message queue needs to be made in the parent process, maybe even
-    printf("sender thread %d starting\n\n", pthread_self());
+    printf("sender thread %ld starting\n\n", pthread_self());
 
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     
@@ -349,7 +350,7 @@ void *sender(void *send_param_voidptr)
 
         sem_wait(&full);
         sem_wait(&mutex);
-        message m = list_rem_head(sp->l)->to_send;
+        node* m = list_rem_head(sp->l);
         sem_post(&mutex);
         sem_post(&empty);
 
@@ -370,10 +371,20 @@ void *sender(void *send_param_voidptr)
         }
     */
 
-        if(msgsnd(sp->msg_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
+        if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
         {
             perror("Error in msgsnd");
         }
+        printf("sending {%s}\n\n", m->to_send.content);
+        printf("sizeof list: %d\n\n", sp->l->size);
+        int i; 
+        sem_getvalue(&mutex, &i);
+        printf("sem mutex: %i\n", i);
+        i = sem_getvalue(&full, &i);
+        printf("sem full: %i\n",i);
+        i = sem_getvalue(&empty, &i);
+        printf("sem empty: %i\n",i);
+        free(m);
     }
 
     printf("key: %d\n\n", sp->k);
@@ -381,7 +392,7 @@ void *sender(void *send_param_voidptr)
 
 
 
-    printf("sender thread ending\n\n");
+    printf("sender thread %ld ending\n\n", pthread_self());
     pthread_exit(0);
 }
 
@@ -393,7 +404,7 @@ void *worker(void *work_param_voidptr)
 {
     
     //work_param_struct wp = (work_param_struct) *work_param_voidptr;
-    printf("worker thread %d starting\n\n", pthread_self());
+    printf("worker thread %ld starting\n\n", pthread_self());
 
 
 
@@ -401,7 +412,7 @@ void *worker(void *work_param_voidptr)
 
 
 
-    printf("thread %d file_name: %s\n\n", pthread_self(), wp->f_n);
+    printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
 
     
