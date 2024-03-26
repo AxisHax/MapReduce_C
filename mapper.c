@@ -280,16 +280,13 @@ void *sender(void *send_param_voidptr)
 
     node* m;
 
-    for(i = 0; i < sp->num_workers; i++)
-    {
-        printf()
-    }
 
-    while(1) // this is dum, replace with way to check if other threads are done or not
+    while(1)
     {
         for(i = 0; i < sp->num_workers; i++)
         {
             printf("thread %d running flag: %d\n",i, sp->worker_done_flags_sender[i]);
+            printf("sizeof buffer: %d\n\n", sp->l->size);
             if(!sp->worker_done_flags_sender[i]) // if worker is working
             {
                 flag = 0; // don't break from greater loop
@@ -312,10 +309,12 @@ void *sender(void *send_param_voidptr)
         sem_post(&mutex);
         sem_post(&empty);
 
-        if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
-        {
-            perror("Error in msgsnd");
-        }
+        msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0); 
+        //if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
+        //{
+            //printf("error in msgsnd\n");
+            //perror("Error in msgsnd");
+        //}
         //printf("sending {%s}\n", m->to_send.content);
         //printf("sizeof list: %d\n", sp->l->size);
         //free(m); // free(): double free detected in tcache 2
