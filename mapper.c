@@ -344,38 +344,41 @@ void *sender(void *send_param_voidptr)
     
     //list* buf = (list *) buff_void; 
 
-    //while(sp->l->size != 0)
-    //{}
-
-    sem_wait(&full);
-    sem_wait(&mutex);
-    message m = list_rem_head(sp->l)->to_send;
-    sem_post(&mutex);
-    sem_post(&empty);
-
-/*
-    int message_queue_id;
-    key_t key;
-    
-    if((key = ftok("mapper.c", 1)) == -1)
+    while(sp->l->size != 0)
     {
-        perror("ftok");
-        exit(1);
-    }
 
-    if((message_queue_id = msgget(key, 0644 | IPC_CREAT)) == -1)
-    {
-        perror("msgget");
-        exit(1);
+        sem_wait(&full);
+        sem_wait(&mutex);
+        message m = list_rem_head(sp->l)->to_send;
+        sem_post(&mutex);
+        sem_post(&empty);
+
+    /*
+        int message_queue_id;
+        key_t key;
+        
+        if((key = ftok("mapper.c", 1)) == -1)
+        {
+            perror("ftok");
+            exit(1);
+        }
+
+        if((message_queue_id = msgget(key, 0644 | IPC_CREAT)) == -1)
+        {
+            perror("msgget");
+            exit(1);
+        }
+    */
+
+        if(msgsnd(sp->msg_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
+        {
+            perror("Error in msgsnd");
+        }
     }
-*/
 
     printf("key: %d\n\n", sp->k);
 
-    if(msgsnd(sp->msg_q_id, &m , MAX_WORD_SIZE, 0) == -1) 
-    {
-        perror("Error in msgsnd");
-    }
+
 
 
     printf("sender thread ending\n\n");
