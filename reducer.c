@@ -332,6 +332,8 @@ int main(int argc, char* argv[])
 
 	list_destroy(list);
 	list_destroy(sortedWords);
+	free(outputFile);
+	fclose(f);
 
 	return 0;
 }
