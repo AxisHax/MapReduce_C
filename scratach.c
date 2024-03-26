@@ -22,6 +22,9 @@
 sem_t empty;
 sem_t full;
 sem_t mutex;
+sem_t empty;
+sem_t full;
+sem_t mutex;
 
 int buf_size;
 
@@ -166,15 +169,25 @@ int main(int argc, char **argv)
     else if(x == 0)
     {
         printf("I am child with pid = %d\n\n", getpid());
+        
+    // variables needed for each process, shared between threads
+    // variables needed for each process, shared between threads
         list* buf = create_list(buff_size);
         pthread_t sender_tid;
         pthread_attr_t sender_attr;
+        pthread_t *worker_tid;
         pthread_t *worker_tid;
         pthread_attr_t *worker_attr;
         int num_workers = 0;
         int i = 0;
         struct dirent *dir_ent;
         DIR *dir = opendir(dir_name);
+
+        char* file_path;
+
+        work_param_struct* wp;
+
+        send_param_struct* sp;
 
         char* file_path;
 
@@ -272,6 +285,8 @@ int main(int argc, char **argv)
 void *sender(void *send_param_voidptr)
 {
     printf("sender thread %ld starting\n\n", pthread_self());
+{
+    printf("sender thread %ld starting\n\n", pthread_self());
 
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     printf("key: %d\n\n", sp->k);
@@ -279,11 +294,6 @@ void *sender(void *send_param_voidptr)
     int flag = 1;
 
     node* m;
-
-    for(i = 0; i < sp->num_workers; i++)
-    {
-        printf()
-    }
 
     while(1) // this is dum, replace with way to check if other threads are done or not
     {
@@ -318,19 +328,30 @@ void *sender(void *send_param_voidptr)
         }
         //printf("sending {%s}\n", m->to_send.content);
         //printf("sizeof list: %d\n", sp->l->size);
-        //free(m); // free(): double free detected in tcache 2
+        free(m); // free(): double free detected in tcache 2
         printf("hello\n");
     }
+
+    
+
+    printf("sender thread %ld ending\n\n", pthread_self());
     printf("sender thread %ld ending\n\n", pthread_self());
     pthread_exit(0);
 }
 
 void *worker(void *work_param_voidptr)
 {
+    
     printf("worker thread %ld starting\n\n", pthread_self());
+    printf("worker thread %ld starting\n\n", pthread_self());
+
+
 
     work_param_struct* wp = (work_param_struct *) work_param_voidptr;
 
+
+
+    printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
 
@@ -341,6 +362,7 @@ void *worker(void *work_param_voidptr)
     char word_1[MAX_WORD_SIZE];
     while(fscanf(to_work, "%s", word_1) != EOF)
     {
+    {
         
         node* new = create_node(word_1);
 
@@ -348,8 +370,11 @@ void *worker(void *work_param_voidptr)
         sem_wait(&empty);
         sem_wait(&mutex);
         list_add_tail(wp->l, new);
+        list_add_tail(wp->l, new);
         sem_post(&mutex);
         sem_post(&full);
+        //printf("added {%s}\n", word_1);
+        //printf("sizeof list: %d\n", wp->l->size);
     }
 
     *(wp->worker_done_flag_worker) = 1;
