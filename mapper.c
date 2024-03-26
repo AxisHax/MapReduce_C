@@ -53,6 +53,7 @@ typedef struct work_param_struct
 {
     char f_n[MAX_WORD_SIZE];
     list* l;
+    char* worker_done_flag_worker;
 } work_param_struct;
 
 typedef struct send_param_struct
@@ -60,6 +61,8 @@ typedef struct send_param_struct
     int msg_q_id;
     key_t k;
     list* l;
+    int num_workers;
+    char worker_done_flags_sender[]; //something to inform when worker threads end
 }send_param_struct;
 
 
@@ -89,8 +92,7 @@ int main(int argc, char **argv)
     } // if file is run without commandFile bufferSize
 
 // VARIABLE DECLARATION AND INITILIZATIONS
-    int buff_size = atoi(argv[2]); // this is the max size of the buffer m_list
-    printf("buff_size: %d\n\n\n\n", buff_size);
+    int buff_size = atoi(argv[2]);
     sem_init(&empty, 0, buff_size);
     sem_init(&full, 0, 0);
     sem_init(&mutex, 0, 1);
@@ -99,6 +101,8 @@ int main(int argc, char **argv)
     pid_t x, wpid;
     int status = 0;
     message end_m;
+
+    //char* worker_done_flag;
 
     int message_queue_id;
     key_t key;
@@ -143,7 +147,10 @@ int main(int argc, char **argv)
 
         // wait for other processes to conclude
         printf("commence waiting\n\n");
-        while ((wpid = wait(&status)) > 0){printf("waiting...\n\n");};
+        while ((wpid = wait(&status)) > 0)
+        {
+            printf("waiting...\n\n");
+        }
         // send end_m in message queue
 
         printf("status: %d\n\n", wait(&status));
@@ -159,7 +166,6 @@ int main(int argc, char **argv)
     else if(x == 0)
     {
         printf("I am child with pid = %d\n\n", getpid());
-        printf("\tline: %s\n\n", dir_name); // line = directory path
         
     // variables needed for each process, shared between threads
         list* buf = create_list(buff_size);
@@ -188,8 +194,22 @@ int main(int argc, char **argv)
         closedir(dir);
         
         dir = opendir(dir_name);
+
         worker_tid = (pthread_t*)malloc(sizeof(pthread_t) * num_workers);
         worker_attr = (pthread_attr_t*)malloc(sizeof(pthread_attr_t) * num_workers);
+
+        sp = malloc(sizeof(send_param_struct) + sizeof(char) * num_workers);
+        sp->l = buf;
+        sp->k = key;
+        sp->msg_q_id = message_queue_id;
+        //sp->worker_done_flags_sender = malloc(sizeof(char) * num_workers);
+        sp->num_workers = num_workers;
+
+
+        for(int j = 0; j < num_workers; j++)
+        {
+            sp->worker_done_flags_sender[j] = 0;
+        }
 
 
         
@@ -207,6 +227,8 @@ int main(int argc, char **argv)
                 wp = malloc(sizeof(work_param_struct));
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
+                wp->worker_done_flag_worker = &sp->worker_done_flags_sender[i];
+
                 //create thread
                 pthread_create(&worker_tid[i], &worker_attr[i], worker, wp);// work param needs "line + filename"
                 i++;
@@ -215,10 +237,7 @@ int main(int argc, char **argv)
         }
 
     // start sender thread
-        sp = malloc(sizeof(send_param_struct));
-        sp->l = buf;
-        sp->k = key;
-        sp->msg_q_id = message_queue_id;
+
 
         pthread_attr_init(&sender_attr);
         pthread_create(&sender_tid, &sender_attr, sender, sp);
@@ -238,6 +257,7 @@ int main(int argc, char **argv)
         closedir(dir);
         free(worker_tid);
         free(worker_attr);
+        //free(worker_done_flag);
         free(wp);
         free(sp);
         printf("child process: %d complete\n\n", getpid());
@@ -256,35 +276,46 @@ void *sender(void *send_param_voidptr)
 
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     printf("key: %d\n\n", sp->k);
+    int i;
+    int flag = 1;
 
-    while(sp->l->size != 0) // this is dum, replace with way to check if other threads are done or not
+    node* m;
+
+    while(1) // this is dum, replace with way to check if other threads are done or not
     {
-    // while(1)
-        // for(worker_threads)
-            // if (thread isn't done) flag = false
-        // if (flag && l->list->size == 0) exit(0)
+        for(i = 0; i < sp->num_workers; i++)
+        {
+            printf("thread %d running flag: %d\n",i, sp->worker_done_flags_sender[i]);
+            if(!sp->worker_done_flags_sender[i]) // if worker is working
+            {
+                flag = 0; // don't break from greater loop
+                break;// break from inner loop
+            }
+            else// set flag to break from outer loop and continue through flags
+            {
+                flag = 1;
+            }
+        }
+
+        if(flag && (sp->l->size == 0))
+        {
+            break;
+        }
 
         sem_wait(&full);
         sem_wait(&mutex);
-        node* m = list_rem_head(sp->l);
+        m = list_rem_head(sp->l);
         sem_post(&mutex);
         sem_post(&empty);
-
 
         if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
         {
             perror("Error in msgsnd");
         }
-        printf("sending {%s}\n\n", m->to_send.content);
-        printf("sizeof list: %d\n\n", sp->l->size);
-        int i; 
-        sem_getvalue(&mutex, &i);
-        printf("sem mutex: %i\n", i);
-        i = sem_getvalue(&full, &i);
-        printf("sem full: %i\n",i);
-        i = sem_getvalue(&empty, &i);
-        printf("sem empty: %i\n",i);
-        free(m);
+        //printf("sending {%s}\n", m->to_send.content);
+        //printf("sizeof list: %d\n", sp->l->size);
+        free(m); // free(): double free detected in tcache 2
+        printf("hello\n");
     }
 
     
@@ -323,8 +354,11 @@ void *worker(void *work_param_voidptr)
         list_add_tail(wp->l, new);
         sem_post(&mutex);
         sem_post(&full);
+        //printf("added {%s}\n", word_1);
+        //printf("sizeof list: %d\n", wp->l->size);
     }
 
+    *(wp->worker_done_flag_worker) = 1;
     printf("worker thread ending\n\n");
     pthread_exit(0);
 }
