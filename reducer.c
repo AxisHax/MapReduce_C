@@ -146,57 +146,60 @@ void list_destroy(List *list)
 /// @param list 
 void list_insert_sorted(Node *node, List *list) {
 	Node *pointer = list -> head;
+	Node *newNode = node_create(node -> word);
+	newNode -> count = node -> count;
+
 	if(list->head == NULL && list->tail == NULL)
 	{// The list is empty, so just add node to the list and return.
-		list -> head = node;
-		list -> tail = node;
+		list -> head = newNode;
+		list -> tail = list -> head;
 		list -> count++;
 		return;
 	}
 	
 	while(pointer != NULL)
 	{
-		if(node->count > pointer->count)
+		if(newNode->count > pointer->count)
 		{
 			if(pointer == list->head)
 			{// Insert node at the beginning
-				node -> prev = NULL;
-				node -> next = pointer;
-				pointer -> prev = node;
-				list -> head = node;
+				newNode -> prev = NULL;
+				newNode -> next = pointer;
+				pointer -> prev = newNode;
+				list -> head = newNode;
 				list -> count++;
 				return;
 			}
 			else
 			{// Insert node between other nodes
-				node -> prev = pointer -> prev;
-				node -> next = pointer;
-				pointer -> prev -> next = node;
-				pointer -> prev = node;
+				newNode -> prev = pointer -> prev;
+				newNode -> next = pointer;
+				pointer -> prev -> next = newNode;
+				pointer -> prev = newNode;
 				list -> count++;
 				return;
 			}
 		}
-		else if(node->count == pointer->count)
+		else if(newNode->count == pointer->count)
 		{
 			// Sort alphabetically.
-			if(strcmp(node->word, pointer->word) < 0)
+			if(strcmp(newNode->word, pointer->word) < 0)
 			{// strcmp returns < 0 when the first unique character in arg1 has a lower ascii value than arg2. Lower ascii value = that word should be first.
 				if(pointer == list->head)
 				{// Insert node at the beginning
-					node -> prev = NULL;
-					node -> next = pointer;
-					pointer -> prev = node;
-					list -> head = node;
+					newNode -> prev = NULL;
+					newNode -> next = pointer;
+					pointer -> prev = newNode;
+					list -> head = newNode;
 					list -> count++;
 					return;
 				}
 				else
 				{// Insert node between other nodes
-					node -> prev = pointer -> prev;
-					node -> next = pointer;
-					pointer -> prev -> next = node;
-					pointer -> prev = node;
+					newNode -> prev = pointer -> prev;
+					newNode -> next = pointer;
+					pointer -> prev -> next = newNode;
+					pointer -> prev = newNode;
 					list -> count++;
 					return;
 				}
@@ -229,10 +232,10 @@ void list_insert_sorted(Node *node, List *list) {
 		}
 		else if(pointer == list->tail)
 		{// Insert at the end of the list
-			pointer -> next = node;
-			node -> prev = pointer;
-			node -> next = NULL;
-			list -> tail = node;
+			pointer -> next = newNode;
+			newNode -> prev = pointer;
+			newNode -> next = NULL;
+			list -> tail = newNode;
 			list -> count++;
 			return;
 		}
@@ -254,7 +257,6 @@ int main(int argc, char* argv[])
 
 	Message message;
 	List *list = list_create();
-	Node *node = NULL;
 	struct msqid_ds info;
 	int message_queue_id;
 	key_t key;
@@ -275,11 +277,9 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	char *end_msg;
 	// Do stuff with words in the message queue.
-	while(1)// check type of message?
+	while(1)
 	{
-		printf("message queue size: %d\n", (int)info.msg_qnum);
 		// Get messages from the message queue
 		if(msgrcv(message_queue_id, &message, MAXWORDSIZE, 0, 0) == -1)
 		{
@@ -287,38 +287,34 @@ int main(int argc, char* argv[])
 			exit(1);
 		}
 
-		strdup(end_msg, message.content);
-		if(strcmp(end_msg, ""))
+		if(strcmp(message.content, "") == 0)
 		{
-			free(end_msg);
 			break;
-		}
+		} 
 
-		printf("%s\n", message.content);
 		// Check if the word already exists in the list. If not, simply add, but if so just increment the count.
 		if(list->head == NULL && list->tail == NULL)
 		{
-			node = node_create(message.content);
+			Node *node = node_create(message.content);
 			list_insert_tail(node, list);
 		}
 		else
 		{
 			Node *cur = list->head;
-			int wordExists = 0; // 0 = false, 1 = true.
-			
 			while(cur != NULL)
 			{
 				if(strcasecmp(message.content, cur->word) == 0)
 				{
-					wordExists = 1; // The word exists in our list.
+					cur -> count++;
+					break;
 				}
-			}
-			free(cur);
-			
-			if(wordExists == 0)
-			{// If we didn't find our word in the list, add it.
-				node = node_create(message.content);
-				list_insert_tail(node, list);
+				else if(cur == list->tail && strcasecmp(message.content, cur->word) != 0)
+				{
+					Node *node = node_create(message.content);
+					list_insert_tail(node, list);
+					break;
+				}
+				cur = cur -> next;
 			}
 		}
 	}
@@ -327,7 +323,10 @@ int main(int argc, char* argv[])
 	List *sortedWords = list_create();
 	Node *cur = list->head;
 	while(cur != NULL)
+	{
 		list_insert_sorted(cur, sortedWords);
+		cur = cur -> next;
+	}
 	
 	// Print list contents.
 	list_print_by_frequency(sortedWords, minFrequency);
@@ -340,8 +339,6 @@ int main(int argc, char* argv[])
 
 	list_destroy(list);
 	list_destroy(sortedWords);
-	free(cur);
-	free(node);
 
 	return 0;
 }
