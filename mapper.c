@@ -23,8 +23,6 @@ sem_t empty;
 sem_t full;
 sem_t mutex;
 
-int buf_size;
-
 
 
 // STRUCT DEFINITIONS
