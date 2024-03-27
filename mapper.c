@@ -193,9 +193,9 @@ int main(int argc, char **argv)
         sp->msg_q_id = message_queue_id;
         sp->num_workers = num_workers;
 
-        for(i = 0; j < num_workers; j++)
+        for(i = 0; i < num_workers; i++)
         {
-            sp->worker_done_flags_sender[j] = 0;
+            sp->worker_done_flags_sender[i] = 0;
         }        
 
 	i = 0;
