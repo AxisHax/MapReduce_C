@@ -244,7 +244,6 @@ int main(int argc, char* argv[])
 	FILE *f;
 	Message message;
 	List *list = list_create();
-	struct msqid_ds info;
 	int message_queue_id;
 	key_t key;
 	
@@ -256,11 +255,6 @@ int main(int argc, char* argv[])
 	if((message_queue_id = msgget(key, 0444)) == -1)
 	{
 		perror("msgget");
-		exit(1);
-	}
-	if(msgctl(message_queue_id, IPC_STAT, &info) == -1)
-	{
-		perror("msgctl");
 		exit(1);
 	}
 
