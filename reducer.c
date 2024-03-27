@@ -274,7 +274,6 @@ int main(int argc, char* argv[])
 			exit(1);
 		}
 
-
 		if(strcmp(message.content, "_") == 0)
 		{// This is the terminal character we're looking for in the message queue to break out of the loop
 			break;
@@ -296,7 +295,7 @@ int main(int argc, char* argv[])
 					cur -> count++;
 					break;
 				}
-				else if(cur == list->tail && strcasecmp(message.content, cur->word) != 0)
+				else if(cur == list->tail && strcmp(message.content, cur->word) != 0)
 				{
 					Node *node = node_create(message.content);
 					list_insert_tail(node, list);
