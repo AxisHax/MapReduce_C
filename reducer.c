@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
 {
 	if (argc != 3) 
     {
-        printf("ERROR: wrong arguments\n");
+        printf("Error: Incorrect arguments.\n");
         return -1;
     }
 
@@ -276,7 +276,7 @@ int main(int argc, char* argv[])
 
 
 		if(strcmp(message.content, "_") == 0)
-		{
+		{// This is the terminal character we're looking for in the message queue to break out of the loop
 			break;
 		} 
 
@@ -316,6 +316,7 @@ int main(int argc, char* argv[])
 		cur = cur -> next;
 	}
 
+	// Create the output file and write words to it.
 	if((f = fopen(outputFile, "w")) == NULL)
 	{
 		printf("Error opening file.");

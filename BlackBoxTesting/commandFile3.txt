@@ -1,0 +1,3 @@
+map searchdir/A
+map searchdir/B
+map searchdir
