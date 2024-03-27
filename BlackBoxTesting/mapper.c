@@ -85,14 +85,14 @@ node* list_rem_head(list* l);
 // MAIN
 int main(int argc, char **argv)
 {
-// CHECK IF ARGS ARE VALID
+    // CHECK IF ARGS ARE VALID
     if (argc != 3) 
     {
         printf("ERROR: wrong arguments\n\n");
         return -1;
     } // if file is run without commandFile bufferSize
 
-// VARIABLE DECLARATION AND INITILIZATIONS
+    // VARIABLE DECLARATION AND INITILIZATIONS
     int buff_size = atoi(argv[2]);
     sem_init(&empty, 0, buff_size);
     sem_init(&full, 0, 0);
@@ -102,10 +102,7 @@ int main(int argc, char **argv)
     pid_t x, wpid;
     int status = 0;
     message end_m;
-
     struct msqid_ds info;
-
-    //char* worker_done_flag;
 
     int message_queue_id;
     key_t key;
@@ -126,8 +123,6 @@ int main(int argc, char **argv)
 		perror("msgctl");
 		exit(1);
 	}
-
-    //printf("Parent process ID should be: %d\n\n", getpid());
     
     while(fscanf(cmd_file, "map %s\n\n", dir_name) != EOF)
     {
@@ -145,35 +140,26 @@ int main(int argc, char **argv)
     if(x > 0)
     {
         fclose(cmd_file);
-        //printf("I am the parent with pid = %d\n\n", getpid());
+        
         // don't return, find proc wait function, do that then send message
-        
         // make end message
-        
         strcpy(end_m.content, "_");// empty word could be a sign
         end_m.type = 1; // idk how to do this
 
         // wait for other processes to conclude
-        //printf("commence waiting\n\n");
         while ((wpid = wait(&status)) > 0)
         {
             //printf("waiting...\n\n");
         }
         // send end_m in message queue
-
-        //printf("status: %d\n\n", wait(&status));
-
         if(msgsnd(message_queue_id, &end_m , MAX_WORD_SIZE, 0) == -1) 
         {
             perror("Error in msgsnd");
         }
-
-        //printf("parent process closing\n\n");
         exit(0);
     }
     else if(x == 0)
     {
-        //printf("I am child with pid = %d\n\n", getpid());
         list* buf = create_list(buff_size);
         pthread_t sender_tid;
         pthread_attr_t sender_attr;
@@ -183,11 +169,8 @@ int main(int argc, char **argv)
         int i = 0;
         struct dirent *dir_ent;
         DIR *dir = opendir(dir_name);
-
         char* file_path;
-
         work_param_struct* wp;
-
         send_param_struct* sp;
 
         while( (dir_ent = readdir(dir)) != NULL)
@@ -209,7 +192,6 @@ int main(int argc, char **argv)
         sp->k = key;
         sp->msg_q_id = message_queue_id;
         sp->num_workers = num_workers;
-
 
         for(int j = 0; j < num_workers; j++)
         {
@@ -240,15 +222,14 @@ int main(int argc, char **argv)
 
         }
 
-    // start sender thread
-
+        // start sender thread
 
         pthread_attr_init(&sender_attr);
         pthread_create(&sender_tid, &sender_attr, sender, sp);
 
 
 
-// WRAP UP VARIABLES AND POINTERS
+        // WRAP UP VARIABLES AND POINTERS
         pthread_join(sender_tid, NULL);
         for(int i = 0; i < num_workers; i++)
         {
@@ -261,14 +242,10 @@ int main(int argc, char **argv)
         closedir(dir);
         free(worker_tid);
         free(worker_attr);
-        //free(worker_done_flag);
         free(wp);
         free(sp);
-        //printf("child process: %d complete\n\n", getpid());
         exit(0);
     }
-
-    //return 0;
 }
 
 
@@ -276,10 +253,7 @@ int main(int argc, char **argv)
 
 void *sender(void *send_param_voidptr)
 {
-    //printf("sender thread %ld starting\n\n", pthread_self());
-
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
-    //printf("key: %d\n\n", sp->k);
     int i;
     int flag = 0;
 
@@ -290,8 +264,6 @@ void *sender(void *send_param_voidptr)
     {
         for(i = 0; i < sp->num_workers; i++)
         {
-            //printf("thread %d running flag: %d\n",i, sp->worker_done_flags_sender[i]);
-            //printf("sizeof buffer: %d\n\n", sp->l->size);
             if(!sp->worker_done_flags_sender[i]) // if worker is working
             {
                 flag = 0; // don't break from greater loop
@@ -314,34 +286,20 @@ void *sender(void *send_param_voidptr)
         sem_post(&mutex);
         sem_post(&empty);
 
-        //msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0); 
         if(msgsnd(sp->msg_q_id, &(m->to_send) , MAX_WORD_SIZE, 0) == -1) 
         {
-            //printf("error in msgsnd\n");
-            //perror("Error in msgsnd");
+            perror("msgsnd");
         }
-        //printf("sending {%s}\n", m->to_send.content);
-        //printf("sizeof list: %d\n", sp->l->size);
-        //free(m);
     }
-    //printf("sender thread %ld ending\n\n", pthread_self());
     pthread_exit(0);
 }
 
 void *worker(void *work_param_voidptr)
 {
-    
-    //printf("worker thread %ld starting\n\n", pthread_self());
-
     work_param_struct* wp = (work_param_struct *) work_param_voidptr;
-
-    //printf("thread %ld file_name: %s\n\n", pthread_self(), wp->f_n);
     FILE* to_work = fopen(wp->f_n, "r");
     node* new;
     
-
-    
-
     char word_1[MAX_WORD_SIZE];
     while(fscanf(to_work, "%s", word_1) != EOF)
     {
@@ -358,7 +316,6 @@ void *worker(void *work_param_voidptr)
     fclose(to_work);
     free(wp->f_n);
     *(wp->worker_done_flag_worker) = 1;
-    //printf("worker thread ending\n\n");
     pthread_exit(0);
 }
 
