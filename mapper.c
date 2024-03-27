@@ -156,6 +156,7 @@ int main(int argc, char **argv)
     }
     else if(x == 0)
     {
+        printf("entering child process\n");
 // CHILD PROCESS
         list* buf = create_list(buff_size);
         pthread_t sender_tid;
@@ -169,36 +170,37 @@ int main(int argc, char **argv)
         char* file_path;
         work_param_struct* wp;
         send_param_struct* sp;
-
+printf("hello\n");
 // COUNT TEXT FILE AMOUNT
         while( (dir_ent = readdir(dir)) != NULL)
         {
+            printf("hello\n");
             if(dir_ent->d_type == DT_REG) 
             {
                 num_workers++;
             }
         }
         closedir(dir);
-        
+  printf("hello\n");      
         dir = opendir(dir_name);
-
+printf("hello\n");
 // THREAD HANDLING
         worker_tid = (pthread_t*)malloc(sizeof(pthread_t) * num_workers);
         worker_attr = (pthread_attr_t*)malloc(sizeof(pthread_attr_t) * num_workers);
-
+printf("hello\n");
 // SENDER_PARAM_STRUCT MADE HERE SO WORKER THREADS HAVE ACCESS TO FLAGS
         sp = malloc(sizeof(send_param_struct) + sizeof(char) * num_workers);
         sp->l = buf;
         sp->k = key;
         sp->msg_q_id = message_queue_id;
         sp->num_workers = num_workers;
-
+printf("hello\n");
         for(i = 0; i < num_workers; i++)
         {
             sp->worker_done_flags_sender[i] = 0;
         }        
-
-	i = 0;
+        
+	    i = 0;
         while((  (dir_ent = readdir(dir)) != NULL && i < num_workers)) // how to propperly assign readdir?
         {
             if(dir_ent->d_type == DT_REG)
@@ -254,6 +256,7 @@ int main(int argc, char **argv)
 // FUNCTION DEFINITIONS
 void *sender(void *send_param_voidptr)
 {
+    printf("entering sender thread\n");
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
     int i;
     int flag = 0;
@@ -291,6 +294,7 @@ void *sender(void *send_param_voidptr)
         {
             perror("msgsnd");
         }
+        printf("sent: {%s}\n", m->to_send.content);
     }
     pthread_exit(0);
 }
