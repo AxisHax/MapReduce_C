@@ -60,9 +60,9 @@ typedef struct send_param_struct
     key_t k;
     list* l;
     int num_workers;
-    char worker_done_flags_sender[]; //something to inform when worker threads end
+    char worker_done_flags_sender[];
 
-}send_param_struct;
+} send_param_struct;
 
 
 // FUNCTION DECLARATIONS
@@ -83,14 +83,14 @@ node* list_rem_head(list* l);
 // MAIN
 int main(int argc, char **argv)
 {
-    // CHECK IF ARGS ARE VALID
+// CHECK IF ARGS ARE VALID
     if (argc != 3) 
     {
         printf("ERROR: wrong arguments\n\n");
         return -1;
-    } // if file is run without commandFile bufferSize
+    }
 
-    // VARIABLE DECLARATION AND INITILIZATIONS
+// VARIABLE DECLARATION AND INITILIZATIONS
     int buff_size = atoi(argv[2]);
     sem_init(&empty, 0, buff_size);
     sem_init(&full, 0, 0);
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 		perror("msgctl");
 		exit(1);
 	}
-    
+// PROCESS HANDLING
     while(fscanf(cmd_file, "map %s\n\n", dir_name) != EOF)
     {
         // for each map command, fork
@@ -131,16 +131,14 @@ int main(int argc, char **argv)
             fclose(cmd_file);
             break;
         }
-        //continue
     }
 
 
     if(x > 0)
     {
-        fclose(cmd_file);
-        
-        // don't return, find proc wait function, do that then send message
-        // make end message
+// PARENT PROCESS
+	fclose(cmd_file);
+
         strcpy(end_m.content, "_");// empty word could be a sign
         end_m.type = 1; // idk how to do this
 
@@ -158,6 +156,7 @@ int main(int argc, char **argv)
     }
     else if(x == 0)
     {
+// CHILD PROCESS
         list* buf = create_list(buff_size);
         pthread_t sender_tid;
         pthread_attr_t sender_attr;
@@ -171,6 +170,7 @@ int main(int argc, char **argv)
         work_param_struct* wp;
         send_param_struct* sp;
 
+// COUNT TEXT FILE AMOUNT
         while( (dir_ent = readdir(dir)) != NULL)
         {
             if(dir_ent->d_type == DT_REG) 
@@ -182,20 +182,23 @@ int main(int argc, char **argv)
         
         dir = opendir(dir_name);
 
+// THREAD HANDLING
         worker_tid = (pthread_t*)malloc(sizeof(pthread_t) * num_workers);
         worker_attr = (pthread_attr_t*)malloc(sizeof(pthread_attr_t) * num_workers);
 
+// SENDER_PARAM_STRUCT MADE HERE SO WORKER THREADS HAVE ACCESS TO FLAGS
         sp = malloc(sizeof(send_param_struct) + sizeof(char) * num_workers);
         sp->l = buf;
         sp->k = key;
         sp->msg_q_id = message_queue_id;
         sp->num_workers = num_workers;
 
-        for(int j = 0; j < num_workers; j++)
+        for(i = 0; j < num_workers; j++)
         {
             sp->worker_done_flags_sender[j] = 0;
         }        
-        
+
+	i = 0;
         while((  (dir_ent = readdir(dir)) != NULL && i < num_workers)) // how to propperly assign readdir?
         {
             if(dir_ent->d_type == DT_REG)
@@ -205,8 +208,8 @@ int main(int argc, char **argv)
                 strcpy(file_path, dir_name);
                 strcat(file_path, "/");
                 strcat(file_path, dir_ent->d_name);
-                // put file path in work_param_struct
                 
+		// put file path in work_param_struct
                 wp = malloc(sizeof(work_param_struct));
                 strcpy(wp->f_n, file_path);
                 wp->l = buf;
@@ -220,23 +223,24 @@ int main(int argc, char **argv)
 
         }
 
-        // start sender thread
+// START SENDER THREAD
 
         pthread_attr_init(&sender_attr);
         pthread_create(&sender_tid, &sender_attr, sender, sp);
 
 
 
-        // WRAP UP VARIABLES AND POINTERS
+// WRAP UP VARIABLES AND POINTERS
+// WAIT UNTIL ALL THREADS COMPLETE TO DO THIS	    
         pthread_join(sender_tid, NULL);
         for(int i = 0; i < num_workers; i++)
         {
             pthread_join(worker_tid[i], NULL);
         }
         list_destroy(buf);
-        sem_destroy(&empty);// workers wait on this to put struct in buffer
-        sem_destroy(&full);// senders wait on this to send struct to reducer.c
-        sem_destroy(&mutex);//
+        sem_destroy(&empty);
+        sem_destroy(&full);
+        sem_destroy(&mutex);
         closedir(dir);
         free(worker_tid);
         free(worker_attr);
@@ -248,7 +252,6 @@ int main(int argc, char **argv)
 
 
 // FUNCTION DEFINITIONS
-
 void *sender(void *send_param_voidptr)
 {
     send_param_struct* sp = (send_param_struct *) send_param_voidptr;
